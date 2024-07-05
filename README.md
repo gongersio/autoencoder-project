@@ -1,2 +1,2 @@
-#Basic Autoencoder Model using CNNs
+# Basic Autoencoder Model using CNNs
 Yet to be tested fully.
