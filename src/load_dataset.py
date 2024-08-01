@@ -4,7 +4,7 @@ import subprocess
 import random
 import pickle
 
-#Import all the pytorch libraries required to implement the autoencoder.
+#Import all the pytorch libraries required to create the PyTorch dataset.
 from torch.utils.data import Dataset, ConcatDataset
 from torchvision import transforms
 from PIL import Image
