@@ -73,10 +73,19 @@ class FrameDataset(Dataset):
 
 if __name__ == "__main__":
     #The model should be trained on both types of video - tags are used to distinguish them.
-    nat_hist_dataset = FrameDataset("../natural_history_museum/training_videos", 0)
-    frameless_dataset = FrameDataset("../frameless/training_videos", 1)
-    combined_dataset = ConcatDataset([frameless_dataset, nat_hist_dataset])
+    nat_hist_train_dataset = FrameDataset("../natural_history_museum/training_videos", 0)
+    frameless_train_dataset = FrameDataset("../frameless/training_videos", 1)
+    combined_train_dataset = ConcatDataset([nat_hist_train_dataset, frameless_train_dataset])
 
-    #Save the combined dataset to avoid repeating the frame extraction process.
-    with open('combined_dataset.pkl', 'wb') as f:
-        pickle.dump(combined_dataset, f)
+    nat_hist_eval_dataset = FrameDataset("../natural_history_museum/validation_videos", 0)
+    frameless_eval_dataset = FrameDataset("../frameless/validation_videos", 1)
+    combined_eval_dataset = ConcatDataset([nat_hist_eval_dataset, frameless_eval_dataset])
+
+    #Save the combined datasets to avoid repeating the frame extraction process.
+    with open('combined_train_dataset.pkl', 'wb') as f:
+        pickle.dump(combined_train_dataset, f)
+    
+    with open('combined_eval_dataset.pkl', 'wb') as f:
+        pickle.dump(combined_eval_dataset, f)
+
+    
