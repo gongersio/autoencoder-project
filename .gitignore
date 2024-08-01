@@ -1,3 +1,4 @@
 /src/__pycache__/*
 /natural_history_museum/*
 /frameless/*
+*.pkl
