@@ -24,7 +24,7 @@ def save_images(original, reconstructed, epoch, batch_idx, output_dir='output_im
 
     save_image(comparison, f"{output_dir}/epoch_{epoch}_batch_{batch_idx}.png")
 
-def train_model(model: Autoencoder, train_loader: DataLoader, eval_loader: DataLoader, criterion: nn.MSELoss, optimiser: optim.Adam, num_epochs=20):
+def train_autoencoder(model: Autoencoder, train_loader: DataLoader, eval_loader: DataLoader, criterion: nn.MSELoss, optimiser: optim.Adam, num_epochs=20):
     for epoch in range(num_epochs):
         model.train() #Set the model to training mode.
         total_epoch_loss = 0.0
@@ -75,6 +75,6 @@ criterion = nn.MSELoss() #Loss Function (Mean Squared Error)
 optimiser = optim.Adam(model.parameters(), lr=0.001)
 
 #Train the autoencoder.
-train_model(model, train_loader, eval_loader, criterion, optimiser)
+train_autoencoder(model, train_loader, eval_loader, criterion, optimiser)
 torch.save(model.state_dict(), "autoencoder.pth")
 print("Model saved.")
