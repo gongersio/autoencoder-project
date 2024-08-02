@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision.utils import save_image
-from model import Autoencoder
+from models import Autoencoder
 from load_dataset import FrameDataset
 from torch.utils.data import DataLoader
 
