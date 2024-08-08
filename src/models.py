@@ -1,10 +1,11 @@
 import torch.nn as nn
 
 class Autoencoder(nn.Module):
+    '''A feed-forward neural network autoencoder with 4 convolutional layers in each part.'''
     def __init__(self):
         super(Autoencoder, self).__init__()
 
-        #Encoder: compresses the input image to a lower-dimensional representation
+        #Encoder: compresses the input image to a lower-dimensional representation.
         self.encoder = nn.Sequential(
         nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1), #Dimensions: 128, 72, 16 (RGB channels)
         nn.BatchNorm2d(16),
@@ -20,7 +21,7 @@ class Autoencoder(nn.Module):
         nn.ReLU()
         )
         
-        #Decoder: reconstructs the image from the lower-dimensional representation
+        #Decoder: reconstructs the image from the lower-dimensional latent representation
         self.decoder = nn.Sequential(
         nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1), #Dimensions: 32, 18, 64 
         nn.BatchNorm2d(64),
@@ -36,25 +37,34 @@ class Autoencoder(nn.Module):
         )
 
     def forward(self,x):
+        '''The forward pass of the autoencoder.'''
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         return encoded, decoded
     
 class Classifier(nn.Module):
+    '''A feed-forward neural network classifier with one hidden layer.
+
+        Args:
+        input_dim: Dimensionality of input features (i.e. size of the extracted feature vector).
+        hidden_dim (int): Dimensionality (number of neurons) in the hidden layer.
+        output_dim (int): Number of distinct output classes (e.g. non-immersive vs immersive).
+    '''
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(Classifier, self).__init__()
 
-        #First linear layer transforms the dimension of the input features to 'hidden_dim' dimensions.
+        #Linear transformation from the input features to the hidden layer.
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU() #Activation Function
+        self.relu = nn.ReLU()
 
-        #Second linear layer transforms the hidden layer's output to 'output_dim' dimensions (number of classes).
+        #Linear transformation from the hidden layer to output class probabilities.
         self.fc2 = nn.Linear(hidden_dim, output_dim)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
-        out = self.fc1(x)
-        out = self.relu(out)
-        out = self.fc2(out)
-        out = self.softmax(out)
-        return out
+        '''The forward pass of the classifier.'''
+        output = self.fc1(x)
+        output = self.relu(output)
+        output = self.fc2(output)
+        output = self.softmax(output)
+        return output
