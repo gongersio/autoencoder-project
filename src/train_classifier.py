@@ -43,14 +43,18 @@ def extract_features(encoder, dataloader):
 
     return features, labels
 
-def train_classifier(train_features, train_labels, eval_features, eval_labels, input_dim, hidden_dim, output_dim, num_epochs=20):
+def create_feature_dataset(encoder: Autoencoder, frame_dataset: FrameDataset, shuffle=True):
+    '''Creates a feature dataset from a given frame dataset.'''
+    frame_loader = DataLoader(frame_dataset, batch_size=32, shuffle=shuffle, num_workers=4, pin_memory=True)
+    features, labels = extract_features(encoder, frame_loader)
+
+    feature_dataset = TensorDataset(features, labels)
+    feature_loader = DataLoader(feature_dataset, batch_size=32, shuffle=shuffle, num_workers=4, pin_memory=True)
+
+    return features, feature_loader
+
+def train_classifier(train_loader, eval_loader, input_dim, hidden_dim, output_dim, num_epochs=20):
     '''Train the classifier model using the extracted features and labels, for the specified number of epochs.'''
-    train_dataset = TensorDataset(train_features, train_labels)
-    train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
-
-    eval_dataset = TensorDataset(eval_features, eval_labels)
-    eval_dataloader = DataLoader(eval_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
-
     #Initialise the model, criterion, and optimiser.
     model = Classifier(input_dim, hidden_dim, output_dim)
     criterion = nn.CrossEntropyLoss()
@@ -60,7 +64,7 @@ def train_classifier(train_features, train_labels, eval_features, eval_labels, i
         model.train() #Set the model to training mode.
         total_train_loss = 0.0
         
-        for batch_features, batch_labels in train_dataloader:
+        for batch_features, batch_labels in train_loader:
             #Clear all the gradients.
             optimiser.zero_grad()
 
@@ -78,7 +82,7 @@ def train_classifier(train_features, train_labels, eval_features, eval_labels, i
             total_train_loss += batch_loss.item() * batch_features.size(0)
         
         #Calculate the average training loss per epoch.
-        avg_train_loss = total_train_loss / len(train_dataloader.dataset)
+        avg_train_loss = total_train_loss / len(train_loader.dataset)
 
         model.eval() #Set the model to evaluation mode.
         total_eval_loss = 0.0
@@ -86,7 +90,7 @@ def train_classifier(train_features, train_labels, eval_features, eval_labels, i
         total = 0
 
         with torch.no_grad():
-            for batch_features, batch_labels in eval_dataloader:
+            for batch_features, batch_labels in eval_loader:
                 predictions = model(batch_features)
                 batch_loss: torch.Tensor = criterion(predictions, batch_labels)
                 total_eval_loss += batch_loss.item() * batch_features.size(0)
@@ -97,7 +101,7 @@ def train_classifier(train_features, train_labels, eval_features, eval_labels, i
                 correct += (predicted == batch_labels).sum().item()
 
         #Calculate the average validation loss per epoch and the validation accuracy.
-        avg_eval_loss = total_eval_loss / len(eval_dataloader.dataset)
+        avg_eval_loss = total_eval_loss / len(eval_loader.dataset)
         eval_accuracy = correct/total    
         
         print(f'Epoch [{epoch+1}/{num_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_eval_loss:.4f}, Val Accuracy: {eval_accuracy:.4f}')
@@ -123,30 +127,19 @@ def evaluate_classifier(model: Classifier, test_features, test_labels):
     print(f'F1 Score: {f1:.4f}')
 
 if __name__ == "__main__":
+    encoder = load_encoder("autoencoder.pth")
+    
     train_dataset = load_dataset("train_classifier.pkl")
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
+    train_features, train_loader = create_feature_dataset(encoder, train_dataset)
 
     eval_dataset = load_dataset("eval_classifier.pkl")
-    eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
+    eval_features, eval_loader = create_feature_dataset(encoder, eval_dataset, shuffle=False)
 
-    #Initialise the test dataset.
-    nat_hist_test = FrameDataset("../natural_history_museum/classifier_testing")
-    frameless_test = FrameDataset("../frameless/classifier_testing")
-    test_classifier = ConcatDataset([nat_hist_test, frameless_test])
-    test_loader = DataLoader(test_classifier, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
-
-    encoder = load_encoder("autoencoder.pth")
-
-    train_features, train_labels = extract_features(encoder, train_loader)
-    eval_features, eval_labels = extract_features(encoder, eval_loader)
+    test_dataset = load_dataset("test_classifier.pkl")
+    test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
     test_features, test_labels = extract_features(encoder, test_loader)
 
-    #Define the arguments for initialising the classifier.
-    input_dim = train_features.size(1)
-    hidden_dim = 128
-    output_dim = 2 #Binary Classification
-
-    classifier = train_classifier(train_features, train_labels, eval_features, eval_labels, input_dim, hidden_dim, output_dim)
+    classifier = train_classifier(train_loader, eval_loader, train_features.size(1), 128, 2)
     evaluate_classifier(classifier, test_features, test_labels)
 
     #Save the classifier model.
