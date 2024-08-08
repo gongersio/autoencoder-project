@@ -88,9 +88,14 @@ if __name__ == "__main__":
     train_classifier = ConcatDataset([nat_hist_train, frameless_train])
 
     #Create a frame dataset (with labels) that will be used to validate the classifer.
-    nat_hist_train = FrameDataset("../natural_history_museum/classifier_validation", 0)
-    frameless_train = FrameDataset("../frameless/classifier_validation", 1)
-    eval_classifier = ConcatDataset([nat_hist_train, frameless_train])
+    nat_hist_eval = FrameDataset("../natural_history_museum/classifier_validation", 0)
+    frameless_eval = FrameDataset("../frameless/classifier_validation", 1)
+    eval_classifier = ConcatDataset([nat_hist_eval, frameless_eval])
+
+    #Create a frame dataset (with labels) that will be used to test the classifer.
+    nat_hist_test = FrameDataset("../natural_history_museum/classifier_testing")
+    frameless_test = FrameDataset("../frameless/classifier_testing")
+    test_classifier = ConcatDataset([nat_hist_test, frameless_test])
 
     #Save all the datasets to avoid repeating the frame extraction process.
     with open('train_autoencoder.pkl', 'wb') as f:
@@ -104,3 +109,6 @@ if __name__ == "__main__":
 
     with open('eval_classifier.pkl', 'wb') as f:
         pickle.dump(eval_classifier, f)
+
+    with open('test_classifier.pkl', 'wb') as f:
+        pickle.dump(test_classifier, f)
