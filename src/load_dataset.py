@@ -104,5 +104,3 @@ if __name__ == "__main__":
 
     with open('eval_classifier.pkl', 'wb') as f:
         pickle.dump(eval_classifier, f)
-
-    
