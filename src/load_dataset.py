@@ -102,7 +102,7 @@ if __name__ == "__main__":
     with open('train_classifier.pkl', 'wb') as f:
         pickle.dump(train_classifier, f)
 
-    with open('eval_classifier', 'wb') as f:
+    with open('eval_classifier.pkl', 'wb') as f:
         pickle.dump(eval_classifier, f)
 
     
