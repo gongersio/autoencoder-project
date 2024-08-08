@@ -80,7 +80,7 @@ if __name__ == "__main__":
     eval_dataset = load_dataset("eval_autoencoder.pkl")
     eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
 
-    #Initialise the criterion, model, and optimiser.
+    #Initialise the model, criterion, and optimiser.
     model = Autoencoder()
     criterion = nn.MSELoss() #Loss Function (Mean Squared Error)
     optimiser = optim.Adam(model.parameters(), lr=0.001)
