@@ -93,8 +93,8 @@ if __name__ == "__main__":
     eval_classifier = ConcatDataset([nat_hist_eval, frameless_eval])
 
     #Create a frame dataset (with labels) that will be used to test the classifer.
-    nat_hist_test = FrameDataset("../natural_history_museum/classifier_testing")
-    frameless_test = FrameDataset("../frameless/classifier_testing")
+    nat_hist_test = FrameDataset("../natural_history_museum/classifier_testing", 0)
+    frameless_test = FrameDataset("../frameless/classifier_testing", 1)
     test_classifier = ConcatDataset([nat_hist_test, frameless_test])
 
     #Save all the datasets to avoid repeating the frame extraction process.
