@@ -55,16 +55,18 @@ class Classifier(nn.Module):
 
         #Linear transformation from the input features to the hidden layer.
         self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
+        self.bn1 = nn.BatchNorm1d(hidden_dim)
+        self.leaky_relu = nn.LeakyReLU()
+        self.dropout = nn.Dropout(0.3)
 
         #Linear transformation from the hidden layer to output class probabilities.
         self.fc2 = nn.Linear(hidden_dim, output_dim)
-        self.softmax = nn.Softmax(dim=1)
-
+        
     def forward(self, x):
         '''The forward pass of the classifier.'''
         output = self.fc1(x)
-        output = self.relu(output)
+        output = self.bn1(output)
+        output = self.leaky_relu(output)
+        output = self.dropout(output)
         output = self.fc2(output)
-        output = self.softmax(output)
         return output
