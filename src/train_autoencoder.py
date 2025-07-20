@@ -74,10 +74,10 @@ def train_autoencoder(model: Autoencoder, train_loader: DataLoader, eval_loader:
 
 
 if __name__ == "__main__":
-    train_dataset = load_dataset("train_autoencoder.pkl")
+    train_dataset = load_dataset("datasets/train_autoencoder.pkl")
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
 
-    eval_dataset = load_dataset("eval_autoencoder.pkl")
+    eval_dataset = load_dataset("datasets/eval_autoencoder.pkl")
     eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
 
     #Initialise the model, criterion, and optimiser.
@@ -88,5 +88,5 @@ if __name__ == "__main__":
     train_autoencoder(model, train_loader, eval_loader, criterion, optimiser)
 
     #Save the autoencoder model.
-    torch.save(model.state_dict(), "autoencoder.pth")
+    torch.save(model.state_dict(), "models/autoencoder.pth")
     print("Model saved.")
