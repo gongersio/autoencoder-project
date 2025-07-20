@@ -17,7 +17,7 @@ class FrameDataset(Dataset):
 
         #All frames should be transformed into pytorch tensors of a fixed size for the autoencoder.
         self.transform = transforms.Compose([
-            transforms.Resize((256,144)), #Downscale the frames before processing.
+            transforms.Resize((512,288)), #Downscale the frames (height, width) before processing.
             transforms.ToTensor()
         ])
 
@@ -97,18 +97,17 @@ if __name__ == "__main__":
     frameless_test = FrameDataset("../frameless/classifier_testing", 1)
     test_classifier = ConcatDataset([nat_hist_test, frameless_test])
 
-    #Save all the datasets to avoid repeating the frame extraction process.
-    with open('train_autoencoder.pkl', 'wb') as f:
+    with open('datasets/train_autoencoder.pkl', 'wb') as f:
         pickle.dump(train_autoencoder, f)
     
-    with open('eval_autoencoder.pkl', 'wb') as f:
+    with open('datasets/eval_autoencoder.pkl', 'wb') as f:
         pickle.dump(eval_autoencoder, f)
 
-    with open('train_classifier.pkl', 'wb') as f:
+    with open('datasets/train_classifier.pkl', 'wb') as f:
         pickle.dump(train_classifier, f)
 
-    with open('eval_classifier.pkl', 'wb') as f:
+    with open('datasets/eval_classifier.pkl', 'wb') as f:
         pickle.dump(eval_classifier, f)
 
-    with open('test_classifier.pkl', 'wb') as f:
+    with open('datasets/test_classifier.pkl', 'wb') as f:
         pickle.dump(test_classifier, f)
