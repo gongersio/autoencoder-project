@@ -16,7 +16,7 @@ def load_dataset(file_path):
 
     return dataset
 
-def save_images(original, reconstructed, epoch, batch_idx, output_dir='output_images'):
+def save_images(original, reconstructed, epoch, batch_idx, output_dir='comparison_grids'):
     '''Save a comparison of a selection (5 each) of both original and reconstructed frames.'''
     os.makedirs(output_dir, exist_ok=True)
 
