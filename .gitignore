@@ -1,8 +1,8 @@
 /src/__pycache__/*
 /src/comparison_grids/*
 /src/datasets/*
-/src/heatmaps/*
 /src/models/*
 /natural_history_museum/*
 /frameless/*
 *.jpg
+*.png
