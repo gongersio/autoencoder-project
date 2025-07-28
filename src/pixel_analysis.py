@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from PIL import Image
 from pathlib import Path
+from sklearn.cluster import KMeans
 
 def load_dataset(file_path):
     '''Load a previously saved dataset from the specified file path.'''
@@ -94,13 +95,19 @@ def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir
             ch_img = to_img(normalize(ch_map))
             ch_img.save(os.path.join(path, f"top{rank+1}_ch{ch_idx.item()}.png"))
 
-def generate_class_heatmaps(dir, output, pattern="*.png"):
+def generate_class_heatmaps(dir, avg_output, cluster_output, pattern="*.png", clusters=5):
     files = list(dir.glob(pattern))
     accumulator = None
+
+    img_maps = []
+    flat_maps = []
 
     for f in files:
         img = Image.open(f)
         arr = np.asarray(img, dtype=np.float32)
+
+        img_maps.append(arr)
+        flat_maps.append(arr.flatten())
 
         if accumulator is None:
             accumulator = np.zeros_like(arr, dtype=np.float32)
@@ -116,7 +123,34 @@ def generate_class_heatmaps(dir, output, pattern="*.png"):
     else:
         stretch = mean_arr.clip(0, 255).astype(np.uint8)
 
-    Image.fromarray(stretch).save(output) 
+    Image.fromarray(stretch).save(avg_output)
+
+    X = np.stack(flat_maps) #(N, height x width)
+    H, W = img_maps[0].shape
+
+    #Run K-Means clustering to group similar maps.
+    kmeans = KMeans(n_clusters=clusters, random_state=0)
+    labels = kmeans.fit_predict(X)
+
+    #Average all maps per cluster.
+    for cluster_id in range(clusters):
+        cluster_maps = [img_maps[i] for i in range(len(labels)) if labels[i] == cluster_id]
+
+        if not cluster_maps:
+            print(f"No images assigned to cluster {cluster_id}.")
+            continue
+
+        cluster_avg = np.mean(cluster_maps, axis=0)
+        mn, mx = cluster_avg.min(), cluster_avg.max()
+
+        #Normalise the array for better visualisation.
+        if mx > mn:
+            stretched = ((cluster_avg - mn) / (mx - mn) * 255).astype(np.uint8)
+        else:
+            stretched = cluster_avg.clip(0, 255).astype(np.uint8)
+
+        out_path = os.path.join(cluster_output, f"cluster_{cluster_id}.png")
+        Image.fromarray(stretched).save(out_path)
 
 def generate_difference_maps(file1, file2):
     arr1 = np.array(Image.open(file1), dtype=np.float32)
@@ -140,9 +174,9 @@ if __name__ == "__main__":
     dataset = load_dataset("datasets/train_classifier.pkl")
     loader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=4)
 
-    generate_image_heatmaps(loader, encoder)
+    #generate_image_heatmaps(loader, encoder)
 
-    #generate_class_heatmaps(Path("heatmaps/class_0/avg"), "average0.png")
-    #generate_class_heatmaps(Path("heatmaps/class_1/avg"), "average1.png")
+    generate_class_heatmaps(Path("heatmaps/class_0/avg"), "average0.png", Path("heatmaps/class_0/clusters"))
+    generate_class_heatmaps(Path("heatmaps/class_1/avg"), "average1.png", Path("heatmaps/class_1/clusters"))
 
     #generate_difference_maps("average0.png", "average1.png")
