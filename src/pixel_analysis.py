@@ -29,9 +29,13 @@ def load_encoder(file_path):
 def normalize(x):
     return (x - x.min()) / (x.max() - x.min() + 1e-8)
 
-def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir='heatmaps'):
+def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir='heatmaps', topk=7):
     to_img = transforms.ToPILImage()
     global_id = 0
+
+    num_channels = 128
+    channel_sums = {} #Label -> (channels, height, width)
+    channel_counts = {}
 
     with torch.no_grad():
         for batch_imgs, batch_labels in loader:
@@ -64,7 +68,31 @@ def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir
                 max_img = to_img(normalize(max_map))
                 max_img.save(os.path.join(output_dir, f'class_{label}', 'max', fname))
 
+                #Accumulate per-class channel sums.
+                if label not in channel_sums:
+                    channel_sums[label] = torch.zeros_like(features)
+                    channel_counts[label] = 0
+
+                channel_sums[label] += features
+                channel_counts[label] += 1
+
                 global_id += 1
+    
+    #Calculate the average activation in each individual channel for each class.
+    for label, summed in channel_sums.items():
+        count = channel_counts[label]
+        avg_channels = summed / count
+
+        #Score each channel by standard deviation to find spatially diverse channels.
+        channel_scores = avg_channels.std(dim=(1, 2))
+        topk_indices = torch.topk(channel_scores, topk).indices
+
+        path = os.path.join(output_dir, f'class_{label}', 'topk')
+
+        for rank, ch_idx in enumerate(topk_indices):
+            ch_map = avg_channels[ch_idx]
+            ch_img = to_img(normalize(ch_map))
+            ch_img.save(os.path.join(path, f"top{rank+1}_ch{ch_idx.item()}.png"))
 
 def generate_class_heatmaps(dir, output, pattern="*.png"):
     files = list(dir.glob(pattern))
@@ -112,9 +140,9 @@ if __name__ == "__main__":
     dataset = load_dataset("datasets/train_classifier.pkl")
     loader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=4)
 
-    #generate_image_heatmaps(loader, encoder)
+    generate_image_heatmaps(loader, encoder)
 
     #generate_class_heatmaps(Path("heatmaps/class_0/avg"), "average0.png")
     #generate_class_heatmaps(Path("heatmaps/class_1/avg"), "average1.png")
 
-    generate_difference_maps("average0.png", "average1.png")
+    #generate_difference_maps("average0.png", "average1.png")
