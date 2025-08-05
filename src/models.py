@@ -7,32 +7,26 @@ class Autoencoder(nn.Module):
 
         #Encoder: compresses the input image to a lower-dimensional representation.
         self.encoder = nn.Sequential(
-        nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1), #Dimensions: 128, 72, 16 (RGB channels)
+        nn.Conv2d(3, 8, kernel_size=3, stride=2, padding=1), #Dimensions: 512, 288, 8 (channels)
+        nn.BatchNorm2d(8),
+        nn.ReLU(),
+        nn.Conv2d(8, 16, kernel_size=3, stride=2, padding=1), #Dimensions: 256, 144, 16
         nn.BatchNorm2d(16),
         nn.ReLU(),
-        nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1), #Dimensions: 64, 36, 32
+        nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1), #Dimensions: 128, 72, 32
         nn.BatchNorm2d(32),
         nn.ReLU(),
-        nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1), #Dimensions: 32, 18, 64
-        nn.BatchNorm2d(64),
-        nn.ReLU(),
-        nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1), #Dimensions: 16, 9, 128
-        nn.BatchNorm2d(128),
-        nn.ReLU()
         )
         
-        #Decoder: reconstructs the image from the lower-dimensional latent representation
+        #Decoder: reconstructs the image from the lower-dimensional latent representation.
         self.decoder = nn.Sequential(
-        nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1), #Dimensions: 32, 18, 64 
-        nn.BatchNorm2d(64),
-        nn.ReLU(),
-        nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1), #Dimensions: 64, 36, 32
-        nn.BatchNorm2d(32),
-        nn.ReLU(),
-        nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1), #Dimensions: 128, 72, 16
+        nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1), #Dimensions: 256, 144, 16 
         nn.BatchNorm2d(16),
         nn.ReLU(),
-        nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1), # Dimension: 256, 144, 3
+        nn.ConvTranspose2d(16, 8, kernel_size=3, stride=2, padding=1, output_padding=1), #Dimensions: 512, 288, 8
+        nn.BatchNorm2d(8),
+        nn.ReLU(),
+        nn.ConvTranspose2d(8, 3, kernel_size=3, stride=2, padding=1, output_padding=1), #Dimensions: 1024, 576, 3
         nn.Sigmoid() #Output pixel values in range [0,1].
         )
 
@@ -41,32 +35,3 @@ class Autoencoder(nn.Module):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         return encoded, decoded
-    
-class Classifier(nn.Module):
-    '''A feed-forward neural network classifier with one hidden layer.
-
-        Args:
-        input_dim: Dimensionality of input features (i.e. size of the extracted feature vector).
-        hidden_dim (int): Dimensionality (number of neurons) in the hidden layer.
-        output_dim (int): Number of distinct output classes (e.g. non-immersive vs immersive).
-    '''
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(Classifier, self).__init__()
-
-        #Linear transformation from the input features to the hidden layer.
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.bn1 = nn.BatchNorm1d(hidden_dim)
-        self.leaky_relu = nn.LeakyReLU()
-        self.dropout = nn.Dropout(0.3)
-
-        #Linear transformation from the hidden layer to output class probabilities.
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
-        
-    def forward(self, x):
-        '''The forward pass of the classifier.'''
-        output = self.fc1(x)
-        output = self.bn1(output)
-        output = self.leaky_relu(output)
-        output = self.dropout(output)
-        output = self.fc2(output)
-        return output
