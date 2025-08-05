@@ -17,7 +17,7 @@ class FrameDataset(Dataset):
 
         #All frames should be transformed into pytorch tensors of a fixed size for the autoencoder.
         self.transform = transforms.Compose([
-            transforms.Resize((512,288)), #Downscale the frames (height, width) before processing.
+            transforms.Resize((1024,576)), #Downscale the frames (height, width) before processing.
             transforms.ToTensor()
         ])
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     frameless_eval = FrameDataset("../frameless/autoencoder_validation")
     eval_autoencoder = ConcatDataset([nat_hist_eval, frameless_eval])
 
-    #Create a frame dataset (with labels) that will be used to train the classifer.
+    ''' #Create a frame dataset (with labels) that will be used to train the classifer.
     nat_hist_train = FrameDataset("../natural_history_museum/classifier_training", 0)
     frameless_train = FrameDataset("../frameless/classifier_training", 1)
     train_classifier = ConcatDataset([nat_hist_train, frameless_train])
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     #Create a frame dataset (with labels) that will be used to test the classifer.
     nat_hist_test = FrameDataset("../natural_history_museum/classifier_testing", 0)
     frameless_test = FrameDataset("../frameless/classifier_testing", 1)
-    test_classifier = ConcatDataset([nat_hist_test, frameless_test])
+    test_classifier = ConcatDataset([nat_hist_test, frameless_test]) '''
 
     with open('datasets/train_autoencoder.pkl', 'wb') as f:
         pickle.dump(train_autoencoder, f)
@@ -103,11 +103,11 @@ if __name__ == "__main__":
     with open('datasets/eval_autoencoder.pkl', 'wb') as f:
         pickle.dump(eval_autoencoder, f)
 
-    with open('datasets/train_classifier.pkl', 'wb') as f:
+    '''with open('datasets/train_classifier.pkl', 'wb') as f:
         pickle.dump(train_classifier, f)
 
     with open('datasets/eval_classifier.pkl', 'wb') as f:
         pickle.dump(eval_classifier, f)
 
     with open('datasets/test_classifier.pkl', 'wb') as f:
-        pickle.dump(test_classifier, f)
+        pickle.dump(test_classifier, f)'''
