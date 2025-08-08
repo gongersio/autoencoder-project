@@ -28,13 +28,14 @@ def load_encoder(file_path):
     return autoencoder.encoder
 
 def normalize(x):
+    '''Normalize the pixel values in the latent map for better visualisation.'''
     return (x - x.min()) / (x.max() - x.min() + 1e-8)
 
-def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir='heatmaps', topk=7):
+def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir='heatmaps', topk=4):
+    '''Generate heatmaps for each image per class by calculating average activation across all channels. Also find the top-k most different channels between the two classes.'''
     to_img = transforms.ToPILImage()
     global_id = 0
 
-    num_channels = 128
     channel_sums = {} #Label -> (channels, height, width)
     channel_counts = {}
 
@@ -48,16 +49,20 @@ def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir
                 features = latent[i] #(channels, height, width)
                 label = batch_labels[i].item()
 
-                #Average activation for each pixel across all 128 channels.
+                #Average activation for each pixel in the image across all 128 channels.
                 avg_map = features.mean(dim=0)
-                avg_np = (avg_map.numpy()*255).round().astype(np.uint8) #Scale 1-255, as rounded integers.    
+                avg_np = (avg_map.numpy()*255).round().astype(np.uint8) #Scale 1-255, as rounded integers.   
 
-                #Maximum activation for each pixel across all 128 channels.
-                max_map, _ = features.max(dim=0)
+                #Calculate the standard deviation of the top and bottom 8 rows combined.
+                rows = np.concatenate([avg_np[:8], avg_np[-8:]], axis=0)
 
-                #Images with too few unique values are likely to be anomalies.
-                if len(np.unique(avg_np)) < 20:
-                    print(f"Skipping image {global_id} (label {label}): too few unique values")
+                #Calculate the standard deviation of the left and right 3 columns combined.
+                cols = np.concatenate([avg_np[:, :3], avg_np[:, -3:]], axis=1)
+
+                #Remove images with bars on the sides from resizing them.
+                if np.std(rows) < 2 or np.std(cols) < 4:
+                    print(f"Skipping image {global_id} (label {label})")
+                    global_id += 1
                     continue
 
                 #Convert the heatmaps to images
@@ -65,9 +70,6 @@ def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir
 
                 avg_img = to_img(normalize(avg_map))
                 avg_img.save(os.path.join(output_dir, f'class_{label}', 'avg', fname))
-
-                max_img = to_img(normalize(max_map))
-                max_img.save(os.path.join(output_dir, f'class_{label}', 'max', fname))
 
                 #Accumulate per-class channel sums.
                 if label not in channel_sums:
@@ -78,24 +80,37 @@ def generate_image_heatmaps(loader: DataLoader, encoder: Autoencoder, output_dir
                 channel_counts[label] += 1
 
                 global_id += 1
-    
-    #Calculate the average activation in each individual channel for each class.
-    for label, summed in channel_sums.items():
-        count = channel_counts[label]
-        avg_channels = summed / count
 
-        #Score each channel by standard deviation to find spatially diverse channels.
-        channel_scores = avg_channels.std(dim=(1, 2))
-        topk_indices = torch.topk(channel_scores, topk).indices
+    labels = sorted(channel_sums.keys())
 
-        path = os.path.join(output_dir, f'class_{label}', 'topk')
+    #Calculate the average activation map for each channel per class.
+    avg_channels_0 = channel_sums[labels[0]] / channel_counts[labels[0]]
+    avg_channels_1 = channel_sums[labels[1]] / channel_counts[labels[1]]
 
-        for rank, ch_idx in enumerate(topk_indices):
-            ch_map = avg_channels[ch_idx]
-            ch_img = to_img(normalize(ch_map))
-            ch_img.save(os.path.join(path, f"top{rank+1}_ch{ch_idx.item()}.png"))
+    #Calculate the difference between each channel in both classes.
+    difference_map = torch.abs(avg_channels_0 - avg_channels_1)
 
-def generate_class_heatmaps(dir, avg_output, cluster_output, pattern="*.png", clusters=5):
+    #Score each channel by the total difference between the two classes.
+    channel_scores = torch.sum(difference_map, dim=(1, 2))
+
+    #Get the indices of the top-k most different channels
+    topk_indices = torch.topk(channel_scores, topk).indices
+
+    for rank, ch_idx in enumerate(topk_indices):
+        ch_map_0 = avg_channels_0[ch_idx]
+        ch_map_1 = avg_channels_1[ch_idx]
+
+        ch_img_0 = to_img(normalize(ch_map_0))
+        ch_img_1 = to_img(normalize(ch_map_1))
+
+        path_0 = os.path.join(output_dir, f'class_{labels[0]}', 'topk')
+        path_1 = os.path.join(output_dir, f'class_{labels[1]}', 'topk')
+
+        ch_img_0.save(os.path.join(path_0, f"top{rank+1}_ch{ch_idx.item()}.png"))
+        ch_img_1.save(os.path.join(path_1, f"top{rank+1}_ch{ch_idx.item()}.png"))
+
+def generate_class_heatmaps(dir, avg_output, cluster_output, pattern="*.png", clusters=3):
+    '''Generate an average heatmap across all images in a certain class. Also create k clusters of similar heatmaps for each class.'''
     files = list(dir.glob(pattern))
     accumulator = None
 
@@ -126,7 +141,6 @@ def generate_class_heatmaps(dir, avg_output, cluster_output, pattern="*.png", cl
     Image.fromarray(stretch).save(avg_output)
 
     X = np.stack(flat_maps) #(N, height x width)
-    H, W = img_maps[0].shape
 
     #Run K-Means clustering to group similar maps.
     kmeans = KMeans(n_clusters=clusters, random_state=0)
@@ -135,10 +149,6 @@ def generate_class_heatmaps(dir, avg_output, cluster_output, pattern="*.png", cl
     #Average all maps per cluster.
     for cluster_id in range(clusters):
         cluster_maps = [img_maps[i] for i in range(len(labels)) if labels[i] == cluster_id]
-
-        if not cluster_maps:
-            print(f"No images assigned to cluster {cluster_id}.")
-            continue
 
         cluster_avg = np.mean(cluster_maps, axis=0)
         mn, mx = cluster_avg.min(), cluster_avg.max()
@@ -153,19 +163,20 @@ def generate_class_heatmaps(dir, avg_output, cluster_output, pattern="*.png", cl
         Image.fromarray(stretched).save(out_path)
 
 def generate_difference_maps(file1, file2):
+    '''Add docstring.'''
     arr1 = np.array(Image.open(file1), dtype=np.float32)
     arr2 = np.array(Image.open(file2), dtype=np.float32)
 
     diff = arr2 - arr1
     min_diff, max_diff = diff.min(), diff.max()
 
-    #Normalise the array for better visualisation, centering the values at 128 to show contrast.
+    #Normalise the array for better visualisation. Whiter pixels indicate larger differences, where Class 1 has higher activations.
     if max_diff > min_diff:
         diff_normalized = ((diff - min_diff) / (max_diff - min_diff) * 255).astype(np.uint8)
 
-    #Whiter pixels indicate larger differences.
     else:
         diff_normalized = diff.clip(0, 255).astype(np.uint8)
+    
     Image.fromarray(diff_normalized).save("diff.png")
 
 if __name__ == "__main__":
@@ -174,9 +185,9 @@ if __name__ == "__main__":
     dataset = load_dataset("datasets/train_classifier.pkl")
     loader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=4)
 
-    #generate_image_heatmaps(loader, encoder)
+    generate_image_heatmaps(loader, encoder)
 
     generate_class_heatmaps(Path("heatmaps/class_0/avg"), "average0.png", Path("heatmaps/class_0/clusters"))
     generate_class_heatmaps(Path("heatmaps/class_1/avg"), "average1.png", Path("heatmaps/class_1/clusters"))
 
-    #generate_difference_maps("average0.png", "average1.png")
+    generate_difference_maps("average0.png", "average1.png")
