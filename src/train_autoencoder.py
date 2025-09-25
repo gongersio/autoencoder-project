@@ -1,6 +1,6 @@
 import pickle
 import os
-from models import Autoencoder
+from models import FinalEncoder, Autoencoder
 from load_dataset import FrameDataset
 
 import torch
@@ -28,13 +28,15 @@ def save_images(original, reconstructed, epoch, batch_idx, output_dir='compariso
 
     save_image(comparison_grid, f"{output_dir}/epoch_{epoch}_batch_{batch_idx}.png")
 
-def train_autoencoder(model: Autoencoder, train_loader: DataLoader, eval_loader: DataLoader, criterion: nn.MSELoss, optimiser: optim.Adam, num_epochs=20):
+def train_autoencoder(model: Autoencoder, train_loader: DataLoader, eval_loader: DataLoader, criterion: nn.MSELoss, optimiser: optim.Adam, device, num_epochs=20):
     '''Train the autoencoder model for the specified number of epochs.'''
     for epoch in range(num_epochs):
         model.train() #Set the model to training mode.
         total_train_loss = 0.0
 
         for batch_idx, (batch_frames, _) in enumerate(train_loader):
+            batch_frames = batch_frames.to(device)
+
             #Clear all the gradients.
             optimiser.zero_grad()
 
@@ -53,7 +55,7 @@ def train_autoencoder(model: Autoencoder, train_loader: DataLoader, eval_loader:
 
             #Save a comparison grid image for every second epoch.
             if epoch % 2 == 0 and batch_idx == 0:
-                save_images(batch_frames, reconstructed_frames, epoch, batch_idx)
+                save_images(batch_frames.cpu(), reconstructed_frames.cpu(), epoch, batch_idx)
 
         #Calculate the average training loss per epoch.
         avg_train_loss = total_train_loss / len(train_loader.dataset)
@@ -63,6 +65,7 @@ def train_autoencoder(model: Autoencoder, train_loader: DataLoader, eval_loader:
 
         with torch.no_grad():
             for batch_frames, _ in eval_loader:
+                batch_frames = batch_frames.to(device)
                 _, reconstructed_frames = model(batch_frames)
                 batch_loss: torch.Tensor = criterion(batch_frames, reconstructed_frames)
                 total_eval_loss += batch_loss.item() * batch_frames.size(0)
@@ -74,19 +77,32 @@ def train_autoencoder(model: Autoencoder, train_loader: DataLoader, eval_loader:
 
 
 if __name__ == "__main__":
-    train_dataset = load_dataset("datasets/train_autoencoder.pkl")
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4, pin_memory=True)
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {DEVICE}")
 
-    eval_dataset = load_dataset("datasets/eval_autoencoder.pkl")
-    eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=False, num_workers=4, pin_memory=True)
+    #Load the training and evaluation datasets.
+    train_dataset = load_dataset("datasets/train_model.pkl")
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=2, pin_memory=True)
 
-    #Initialise the model, criterion, and optimiser.
-    model = Autoencoder()
+    eval_dataset = load_dataset("datasets/eval_model.pkl")
+    eval_loader = DataLoader(eval_dataset, batch_size=32, shuffle=False, num_workers=2, pin_memory=True)
+
+    #Initialise the Autoencoder using the pretrained encoder weights from the FinalEncoder.
+    model = Autoencoder().to(DEVICE)
+    trained_encoder_model = FinalEncoder(num_classes=2)
+    trained_encoder_model.load_state_dict(torch.load("models/model_85_NEW.pth"))
+    model.encoder.load_state_dict(trained_encoder_model.encoder.encoder.state_dict())
+
+    #Freeze the encoder parameters to prevent them from being updated during training.
+    for param in model.encoder.parameters():
+        param.requires_grad = False
+
+    #Define the loss function and optimiser that only trains the decoder.
     criterion = nn.MSELoss() #Loss Function (Mean Squared Error)
-    optimiser = optim.Adam(model.parameters(), lr=0.001)
+    optimiser = optim.Adam(model.decoder.parameters(), lr=0.001)
 
-    train_autoencoder(model, train_loader, eval_loader, criterion, optimiser)
+    train_autoencoder(model, train_loader, eval_loader, criterion, optimiser, DEVICE)
 
     #Save the autoencoder model.
-    torch.save(model.state_dict(), "models/autoencoder.pth")
+    torch.save(model.state_dict(), "models/autoencoder_NEW.pth")
     print("Model saved.")
