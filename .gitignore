@@ -6,3 +6,4 @@
 /frameless/*
 *.jpg
 *.png
+*.env
